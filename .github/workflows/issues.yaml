@@ -1,0 +1,22 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Triage Issues
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+jobs:
+  label_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Label issues
+        uses: andymckay/labeler@3a4296e9dcdf9576b0456050db78cfd34853f260
+        with:
+          add-labels: "team/area2"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

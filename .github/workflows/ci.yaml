@@ -1,0 +1,33 @@
+name: Run Tests
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  run-tests:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-2019, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v4
+      - name: Install go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: go test
+        run: go test -v ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.56
