@@ -6,7 +6,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Create an EXPLICIT_ACCESS instance granting permissions to the provided SID.
+// GrantSid creates an EXPLICIT_ACCESS instance granting permissions to the provided SID.
 func GrantSid(accessPermissions windows.ACCESS_MASK, sid *windows.SID) windows.EXPLICIT_ACCESS {
 	return windows.EXPLICIT_ACCESS{
 		AccessPermissions: accessPermissions,
@@ -19,7 +19,7 @@ func GrantSid(accessPermissions windows.ACCESS_MASK, sid *windows.SID) windows.E
 	}
 }
 
-// Create an EXPLICIT_ACCESS instance granting permissions to the provided name.
+// GrantName creates an EXPLICIT_ACCESS instance granting permissions to the provided name.
 func GrantName(accessPermissions windows.ACCESS_MASK, name string) windows.EXPLICIT_ACCESS {
 	return windows.EXPLICIT_ACCESS{
 		AccessPermissions: accessPermissions,

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Create an EXPLICIT_ACCESS instance denying permissions to the provided SID.
+// DenySid creates an EXPLICIT_ACCESS instance denying permissions to the provided SID.
 func DenySid(accessPermissions windows.ACCESS_MASK, sid *windows.SID) windows.EXPLICIT_ACCESS {
 	return windows.EXPLICIT_ACCESS{
 		AccessPermissions: accessPermissions,
@@ -19,7 +19,7 @@ func DenySid(accessPermissions windows.ACCESS_MASK, sid *windows.SID) windows.EX
 	}
 }
 
-// Create an EXPLICIT_ACCESS instance denying permissions to the provided name.
+// DenyName creates an EXPLICIT_ACCESS instance denying permissions to the provided name.
 func DenyName(accessPermissions windows.ACCESS_MASK, name string) windows.EXPLICIT_ACCESS {
 	return windows.EXPLICIT_ACCESS{
 		AccessPermissions: accessPermissions,

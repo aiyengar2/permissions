@@ -64,5 +64,4 @@ func TestGetWellKnownSid(t *testing.T) {
 			assert.Equal(t, c.expectedSidString, GetWellKnownSid(c.wellKnownSid).String(), "SID string did not match expected value")
 		})
 	}
-
 }
