@@ -33,6 +33,14 @@ func Everyone() *windows.SID {
 	return mustGetSid(windows.WinWorldSid)
 }
 
+func LocalSystem() *windows.SID {
+	return mustGetSid(windows.WinLocalSystemSid)
+}
+
+func GetWellKnownSid(wellKnownType windows.WELL_KNOWN_SID_TYPE) *windows.SID {
+	return mustGetSid(wellKnownType)
+}
+
 func mustGetUser() *user.User {
 	currentUser, err := user.Current()
 	if err != nil {
