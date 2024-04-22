@@ -12,9 +12,110 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aiyengar2/permissions/pkg/access"
 	"github.com/aiyengar2/permissions/pkg/sid"
 	"golang.org/x/sys/windows"
 )
+
+func TestMkdir_OwnersAndGroups(t *testing.T) {
+	tests := []struct {
+		Name string
+		Dir  string
+		// PreRunDir is a directory which
+		// will exist before the test case runs
+		PreRunDir        string
+		AllowedSIDS      []windows.EXPLICIT_ACCESS
+		ExpectedSddl     string
+		CreationExpected bool
+		ErrExpected      bool
+	}{
+		{
+			Name: "Create Directory With Local System and Administrators",
+			Dir:  "LocalSystemAndAdmins",
+			AllowedSIDS: []windows.EXPLICIT_ACCESS{
+				access.GrantSid(windows.GENERIC_ALL, sid.LocalSystem()),
+				access.GrantSid(windows.GENERIC_ALL, sid.BuiltinAdministrators()),
+			},
+			ExpectedSddl:     "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
+			CreationExpected: true,
+			ErrExpected:      false,
+		},
+		{
+			Name: "Create Directory With Local System and built-in users",
+			Dir:  "LocalSystem",
+			AllowedSIDS: []windows.EXPLICIT_ACCESS{
+				access.GrantSid(windows.GENERIC_ALL, sid.LocalSystem()),
+				access.GrantSid(windows.GENERIC_ALL, sid.Everyone()),
+			},
+			ExpectedSddl:     "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;WD)",
+			CreationExpected: true,
+			ErrExpected:      false,
+		},
+		{
+			Name:             "Create a directory without any explicit access",
+			Dir:              "NoAccessRules",
+			CreationExpected: true,
+			ErrExpected:      false,
+		},
+		{
+			Name:             "Do not create a directory which already exists",
+			Dir:              "AlreadyExists",
+			PreRunDir:        "AlreadyExists",
+			CreationExpected: false,
+			ErrExpected:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			wd, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("Failed to get working directory: %v", err)
+			}
+
+			dir := fmt.Sprintf("%s\\%s", wd, tc.Dir)
+
+			if tc.PreRunDir != "" {
+				err := os.Mkdir(fmt.Sprintf("%s\\%s", wd, tc.PreRunDir), 0777)
+				if err != nil {
+					t.Fatalf("Failed to create pre-run directory: %v", err)
+				}
+			}
+
+			created, err := Mkdir(dir, tc.AllowedSIDS...)
+			if err != nil && !tc.ErrExpected {
+				t.Fatalf("Did not expecte error: %v", err)
+			}
+
+			if !created && tc.CreationExpected {
+				t.Fatalf("Mkdir failed to create directory %s: %v", dir, err)
+			}
+
+			if created && !tc.CreationExpected {
+				t.Fatalf("Mkdir unexpectedly created directory %s: %v", dir, err)
+			}
+
+			if !created && !tc.CreationExpected {
+				return
+			}
+
+			// If we have not defined SIDS for the DACL then
+			// it's expected to just use the default ACL
+			if len(tc.AllowedSIDS) == 0 {
+				return
+			}
+
+			description, err := windows.GetNamedSecurityInfo(dir, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+			if err != nil {
+				t.Fatalf("could not get named security info for directory %s: %v", dir, err)
+			}
+
+			if description.String() != tc.ExpectedSddl {
+				t.Fatalf("expected sddl %s, got sddl %s", tc.ExpectedSddl, description.String())
+			}
+		})
+	}
+}
 
 func TestApply(t *testing.T) {
 	user, userDomain, _, err := sid.CurrentUser().LookupAccount("")
