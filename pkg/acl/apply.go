@@ -3,6 +3,7 @@
 package acl
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/aiyengar2/permissions/pkg/filemode"
@@ -29,44 +30,65 @@ func Chmod(name string, fileMode os.FileMode) error {
 // the provided owner and group (or the current owner and group, if they are set to nil)
 func Apply(name string, owner *windows.SID, group *windows.SID, fileMode os.FileMode) error {
 	// copied from https://github.com/hectane/go-acl/blob/master/chmod.go
-	return ApplyCustom(name, owner, group, filemode.Convert(fileMode).ToExplicitAccessCustom(owner, group)...)
+	isDir := false
+	return apply(name, isDir, owner, group, filemode.Convert(fileMode).ToExplicitAccessCustom(owner, group)...)
 }
 
-// ApplyCustom performs a Chmod (if owner and group are provided) and sets a custom ACL based on the provided EXPLICIT_ACCESS rules
+// Mkdir creates a directory with the provided permissions if it does not exist already
+// If it already exists, it just applies the provided permissions
+func Mkdir(name string, explicitAccess ...windows.EXPLICIT_ACCESS) error {
+	isDir := true
+	return apply(name, isDir, nil, nil, explicitAccess...)
+}
+
+// apply performs a Chmod (if owner and group are provided) and sets a custom ACL based on the provided EXPLICIT_ACCESS rules
 // To create EXPLICIT_ACCESS rules, see the helper functions in pkg/access
-func ApplyCustom(name string, owner *windows.SID, group *windows.SID, explicitAccess ...windows.EXPLICIT_ACCESS) error {
-	var securityInfo windows.SECURITY_INFORMATION
-	// set owner
-	if owner != nil {
-		// override owner
-		securityInfo |= windows.OWNER_SECURITY_INFORMATION
+func apply(path string, directory bool, owner *windows.SID, group *windows.SID, access ...windows.EXPLICIT_ACCESS) error {
+	if path == "" {
+		return fmt.Errorf("cannot apply permissions on empty path")
 	}
 
-	// set group
-	if group != nil {
-		// override group
-		securityInfo |= windows.GROUP_SECURITY_INFORMATION
+	args := securityArgs{
+		path:   path,
+		owner:  owner,
+		group:  group,
+		access: access,
 	}
 
-	// set ACL
-	var dacl *windows.ACL
-	if len(explicitAccess) != 0 {
-		var err error
-		dacl, err = windows.ACLFromEntries(explicitAccess, nil)
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	exists := os.IsNotExist(err)
+
+	if directory && !exists {
+		pathPtr, err := windows.UTF16PtrFromString(path)
 		if err != nil {
 			return err
 		}
-		securityInfo |= windows.DACL_SECURITY_INFORMATION
-		securityInfo |= windows.PROTECTED_DACL_SECURITY_INFORMATION
-	}
-
-	// check if something needs to be modified
-	if securityInfo == 0 {
+		sa, err := args.ToSecurityAttributes()
+		if err != nil {
+			return err
+		}
+		if err = windows.CreateDirectory(pathPtr, sa); err != nil {
+			return err
+		}
 		return nil
 	}
 
+	securityInfo := args.ToSecurityInfo()
+	if securityInfo == 0 {
+		// nothing to change
+		return nil
+	}
+
+	dacl, err := args.ToDACL()
+	if err != nil {
+		return err
+	}
+
 	return windows.SetNamedSecurityInfo(
-		name,
+		path,
 		windows.SE_FILE_OBJECT,
 		securityInfo,
 		owner,
